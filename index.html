@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>日記</title>
+    <style>
+        body {
+            background: radial-gradient(ellipse at 60% 20%, #3b2c23 0%, #1a0e13 100%);
+            color: #e7d3b3;
+            margin: 0;
+            min-height: 100vh;
+            font-family: serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            /* dreamy effect */
+            box-shadow: 0 0 120px 40px #2d1a1a inset;
+        }
+
+        #dateToday {
+            font-family: "MS Mincho", "Hiragino Mincho ProN", serif;
+            font-size: 1.3em;
+            color: #e7d3b3;
+            margin-top: 40px;
+            margin-bottom: 10px;
+            text-align: center;
+            letter-spacing: 0.05em;
+            text-shadow: 0 2px 16px #4e342e, 0 0 2px #fff2, 0 0 8px #bfae99;
+        }
+
+        #diaryInput {
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+
+        #diaryInput {
+            resize: none;
+            border: none;
+            outline: none;
+            font-size: 1.6em;
+            line-height: 1.8;
+            padding: 10px;
+            box-sizing: border-box;
+            width: 80vw;
+            max-width: 700px;
+            height: 500px;
+            margin: 24px 0 32px 0;
+            background: linear-gradient(135deg, #2d1a1a 0%, #3b2c23 60%, #1a0e13 100%);
+            border: 1.5px solid #6d4c41;
+            color: #e7d3b3;
+            box-shadow: 0 4px 32px 0 #1a0e13, 0 0 0 2px #4e342e inset;
+            caret-color: #ffe082;
+            text-align: center;
+            border-radius: 8px;
+            font-family: "MS Mincho", "Hiragino Mincho ProN", serif;
+            transition: box-shadow 0.3s, border 0.3s;
+        }
+
+        #diaryInput:focus {
+            border: 1.5px solid #ffe082;
+            box-shadow: 0 0 24px 4px #ffe08244, 0 0 0 2px #4e342e inset;
+            background: linear-gradient(135deg, #2d1a1a 0%, #4e342e 100%);
+        }
+
+        #diaryInput::placeholder {
+            color: #bfae99;
+            opacity: 0.5;
+            text-shadow: 0 0 6px #4e342e;
+        }
+
+        #entries {
+            width: 80vw;
+            max-width: 700px;
+            margin: 0 auto 40px auto;
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+        }
+
+        .entry {
+            background: linear-gradient(120deg, #2d1a1a 0%, #4e342e 100%);
+            color: #e7d3b3;
+            border-radius: 14px;
+            padding: 22px 22px 16px 22px;
+            box-shadow: 0 6px 32px 0 #1a0e13, 0 0 0 2px #6d4c41 inset;
+            font-size: 1.18em;
+            position: relative;
+            word-break: break-all;
+            border: 1.5px solid #6d4c41;
+            backdrop-filter: blur(1.5px);
+            opacity: 0.97;
+            transition: box-shadow 0.3s, border 0.3s;
+        }
+
+        .entry:hover {
+            box-shadow: 0 0 32px 8px #ffe08233, 0 0 0 2px #ffe082 inset;
+            border: 1.5px solid #ffe082;
+            opacity: 1;
+        }
+
+        .entry-date {
+            color: #bfae99;
+            font-size: 0.95em;
+            position: absolute;
+            top: 10px;
+            right: 18px;
+            font-family: monospace;
+            text-shadow: 0 0 6px #4e342e;
+        }
+
+        /* dreamy floating particles */
+        body::before {
+            content: "";
+            position: fixed;
+            left: 0;
+            top: 0;
+            width: 100vw;
+            height: 100vh;
+            pointer-events: none;
+            z-index: 0;
+            background:
+                radial-gradient(circle at 20% 30%, #ffe08222 0 8vw, transparent 12vw),
+                radial-gradient(circle at 80% 70%, #bfae9922 0 10vw, transparent 14vw),
+                radial-gradient(circle at 60% 10%, #fff1 0 6vw, transparent 10vw),
+                radial-gradient(circle at 40% 80%, #6d4c4122 0 7vw, transparent 12vw);
+            opacity: 0.7;
+            filter: blur(2px);
+            transition: opacity 0.5s;
+        }
+
+        @media (max-width: 600px) {
+            #diaryInput,
+            #entries {
+                width: 98vw;
+            }
+
+            #diaryInput {
+                height: 220px;
+                font-size: 1.1em;
+            }
+
+            .entry {
+                font-size: 1em;
+                padding: 14px 8px 10px 8px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div id="dateToday"></div>
+    <textarea id="diaryInput" autocomplete="off" autofocus></textarea>
+    <div id="entries"></div>
+
+    <script>
+        // GitHub設定
+        const diaryApiUrl = 'https://api.github.com/repos/buzomo/bukome/contents/diary.json';
+        let gh_token = localStorage.getItem('gh_token');
+        try {
+            const parsed = JSON.parse(gh_token);
+            if (parsed?.value) gh_token = parsed.value;
+        } catch { }
+        if (gh_token) localStorage.setItem('gh_token', gh_token);
+
+        // 今日の日付（YYYY-MM-DD）
+        function todayStr() {
+            const d = new Date();
+            return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        }
+
+        // 今日の日付（YYYY年MM月DD日（曜日））を表示
+        function todayDisplayStr() {
+            const d = new Date();
+            const youbi = ['日', '月', '火', '水', '木', '金', '土'];
+            return `${d.getFullYear()}年${String(d.getMonth() + 1).padStart(2, '0')}月${String(d.getDate()).padStart(2, '0')}日（${youbi[d.getDay()]}）`;
+        }
+        document.getElementById('dateToday').textContent = todayDisplayStr();
+
+        let allDiary = [];
+
+        // GitHub diary.json 読み込み
+        async function loadDiary() {
+            try {
+                const res = await fetch(diaryApiUrl, {
+                    headers: gh_token ? { Authorization: `Bearer ${gh_token}` } : {}
+                });
+                if (res.ok) {
+                    const meta = await res.json();
+                    const decoded = decodeURIComponent(escape(atob(meta.content)));
+                    allDiary = JSON.parse(decoded);
+                } else {
+                    allDiary = [];
+                }
+            } catch (e) {
+                allDiary = [];
+            }
+            // 今日のエントリがあればinputにセット
+            const date = todayStr();
+            const todayEntry = allDiary.find(e => e.date === date);
+            if (todayEntry) {
+                diaryInput.value = todayEntry.content;
+            } else {
+                diaryInput.value = '';
+            }
+            renderEntries();
+        }
+
+        // GitHub diary.json 保存
+        async function saveDiary() {
+            let sha = null;
+            try {
+                const metaRes = await fetch(diaryApiUrl, {
+                    headers: gh_token ? { Authorization: `Bearer ${gh_token}` } : {}
+                });
+                if (metaRes.ok) {
+                    const meta = await metaRes.json();
+                    sha = meta.sha;
+                }
+            } catch { }
+            const body = {
+                message: 'Update diary',
+                content: btoa(unescape(encodeURIComponent(JSON.stringify(allDiary, null, 2))))
+            };
+            if (sha) body.sha = sha;
+            await fetch(diaryApiUrl, {
+                method: 'PUT',
+                headers: {
+                    Authorization: `Bearer ${gh_token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(body)
+            });
+        }
+
+        // エントリ描画
+        function renderEntries() {
+            const entries = document.getElementById('entries');
+            entries.innerHTML = '';
+            if (!Array.isArray(allDiary)) return;
+            const date = todayStr();
+            // 今日のエントリを除外
+            [...allDiary]
+                .filter(entry => entry.date !== date && entry.content)
+                .sort((a, b) => (b.date || '').localeCompare(a.date || ''))
+                .forEach(entry => {
+                    const div = document.createElement('div');
+                    div.className = 'entry';
+                    div.innerHTML = `
+                        <span class="entry-date">${entry.date}</span>
+                        <div>${entry.content.replace(/\n/g, '<br>')}</div>
+                    `;
+                    entries.appendChild(div);
+                });
+        }
+
+        // 入力欄
+        const diaryInput = document.getElementById('diaryInput');
+        let saveTimer = null;
+
+        // 入力が落ち着いたら保存
+        diaryInput.addEventListener('input', () => {
+            clearTimeout(saveTimer);
+            saveTimer = setTimeout(async () => {
+                const content = diaryInput.value.trim();
+                if (!content) return;
+                // 既に今日の日付のエントリがあれば上書き
+                const date = todayStr();
+                const idx = allDiary.findIndex(e => e.date === date);
+                if (idx !== -1) {
+                    allDiary[idx].content = content;
+                } else {
+                    allDiary.push({ date, content });
+                }
+                await saveDiary();
+                renderEntries();
+            }, 1200);
+        });
+
+        // Enterで即保存（textarea用: Shift+Enterで改行、Enter単独で保存）
+        diaryInput.addEventListener('keydown', async (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                const content = diaryInput.value.trim();
+                if (!content) return;
+                const date = todayStr();
+                const idx = allDiary.findIndex(e => e.date === date);
+                if (idx !== -1) {
+                    allDiary[idx].content = content;
+                } else {
+                    allDiary.push({ date, content });
+                }
+                await saveDiary();
+                renderEntries();
+                diaryInput.blur();
+            }
+        });
+
+        // GitHubトークン未設定時のオーバーレイ
+        if (!localStorage.getItem('gh_token')) {
+            const overlay = document.createElement('div');
+            overlay.style.position = 'fixed';
+            overlay.style.top = 0;
+            overlay.style.left = 0;
+            overlay.style.width = '100vw';
+            overlay.style.height = '100vh';
+            overlay.style.background = 'rgba(0,0,0,0.95)';
+            overlay.style.zIndex = 9999;
+            overlay.style.display = 'flex';
+            overlay.style.flexDirection = 'column';
+            overlay.style.justifyContent = 'center';
+            overlay.style.alignItems = 'center';
+
+            const input = document.createElement('input');
+            input.type = 'password';
+            input.placeholder = 'GitHub Token を入力してください';
+            input.style.padding = '0.5rem';
+            input.style.fontSize = '1.2rem';
+            input.style.borderRadius = '6px';
+            input.style.marginBottom = '1rem';
+            input.style.width = '300px';
+            input.style.maxWidth = '80vw';
+
+            const btn = document.createElement('button');
+            btn.textContent = '保存してリロード';
+            btn.style.padding = '0.5rem 1rem';
+            btn.style.background = '#4e6cf2';
+            btn.style.color = '#fff';
+            btn.style.border = 'none';
+            btn.style.borderRadius = '6px';
+            btn.style.fontSize = '1rem';
+            btn.style.cursor = 'pointer';
+
+            btn.onclick = () => {
+                if (input.value.trim()) {
+                    localStorage.setItem('gh_token', input.value.trim());
+                    location.reload();
+                }
+            };
+
+            overlay.appendChild(input);
+            overlay.appendChild(btn);
+            document.body.appendChild(overlay);
+            diaryInput.blur();
+        } else {
+            loadDiary();
+        }
+    </script>
+</body>
+
+</html>
